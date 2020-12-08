@@ -1,0 +1,20 @@
+.footer {
+	-fx-background-color: #abbaba
+}
+
+.body {
+	-fx-background-color: #d2e0e0
+}
+.button {
+	-fx-background-color: #6bc286;
+	-fx-background-radius:6.0
+
+}
+
+.button:hover {
+	-fx-background-color:#5bb577;
+}
+
+.button:pressed{
+	-fx-background-color:#5bb577;
+}

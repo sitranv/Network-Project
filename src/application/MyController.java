@@ -7,6 +7,7 @@ import java.net.SocketException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
+import java.util.Enumeration;
 import java.util.ResourceBundle;
 
 import javafx.beans.value.ChangeListener;
@@ -19,25 +20,30 @@ public class MyController implements Initializable {
 	private Thread[] threads = null;
 	private final static int NUM_THREAD = 64;
 	@FXML
-	private Label HostName, HostIP;
+	private Label hostName, hostIP;
 	@FXML
-	private Button click, startScan, btnReset;
+	private Button click, startScan, btnReset, btnStop;
 	@FXML
 	private TextArea txtResult;
+	@FXML
+	private ProgressBar statusBar;
 	@FXML
 	private RadioButton btnDefault, btnRange;
 	@FXML
 	private TextField ipStart, ipDest, test;
 	int[] SubnetMask;
 	private long ipNA, ipBA;
-	private int range;
+	public int range;
+	public double count = 0;
 	String scanMode = "Default Scan";
 
 	public void getLocalInfo() throws UnknownHostException, SocketException {
 		InetAddress local = InetAddress.getLocalHost();
-		HostName.setText(local.getHostName());
-		HostIP.setText(local.getHostAddress());
-
+		hostName.setText(local.getHostName());
+		hostIP.setText(local.getHostAddress());
+		String subnetMask = hostIP.getText().substring(0, hostIP.getText().lastIndexOf(".") + 1);
+		ipStart.setText(subnetMask);
+		ipDest.setText(subnetMask);
 		System.out.println(local.getHostAddress() + "      " + local.getHostName());
 		NetworkInterface nw = NetworkInterface.getByInetAddress(local);
 		int mask = nw.getInterfaceAddresses().get(0).getNetworkPrefixLength();
@@ -96,6 +102,7 @@ public class MyController implements Initializable {
 			btnDefault.setToggleGroup(group);
 			btnRange.setToggleGroup(group);
 			btnDefault.setSelected(true);
+			btnStop.setDisable(true);
 			ipStart.setDisable(true);
 			ipDest.setDisable(true);
 			group.selectedToggleProperty().addListener(new ChangeListener<Toggle>() {
@@ -112,8 +119,6 @@ public class MyController implements Initializable {
 						} else {
 							ipStart.setDisable(false);
 							ipDest.setDisable(false);
-							ipStart.setPromptText(HostIP.getText());
-							ipDest.setPromptText(HostIP.getText());
 						}
 					}
 				};
@@ -162,13 +167,20 @@ public class MyController implements Initializable {
 	}
 
 	public void RunScan() throws SocketException {
+		count = 0;
+		btnReset.setDisable(false);
+		btnStop.setDisable(false);
+		txtResult.setText("");
 		if (scanMode.equals("Default Scan")) {
 			DefaultScan();
 		} else {
-			if (checkInput() == false)
+			if (checkInput() == false) {
+				startScan.setDisable(false);
+
+				btnStop.setDisable(true);
 				System.out.println("Nhap lai");
-			else {
-				ScaninRange();
+			} else {
+				ScanInRange();
 			}
 		}
 	}
@@ -200,17 +212,14 @@ public class MyController implements Initializable {
 		return true;
 	}
 
-	public void ScaninRange() throws SocketException {
-
-		startScan.setDisable(true);
-		btnReset.setDisable(false);
+	public void ScanInRange() throws SocketException {
 		System.out.println("Result IP: ");
 		txtResult.setText("[" + currentDateTime() + "]      IP Scanner App Ready! \n" + "[" + currentDateTime()
 				+ "]      " + "Status change detected: running\n");
 		Long ip1 = ipToLong(ipStart.getText().trim());
 		Long ip2 = ipToLong(ipDest.getText().trim());
 
-		int range = (int) (ip2 - ip1 + 1);
+		range = (int) (ip2 - ip1 + 1);
 		int numThread = 1;
 		for (int i = 1; i < range / 2; i++) {
 			if (range % i == 0) {
@@ -229,8 +238,6 @@ public class MyController implements Initializable {
 	}
 
 	public void DefaultScan() throws SocketException {
-		startScan.setDisable(true);
-		btnReset.setDisable(false);
 		System.out.println("Result IP: ");
 		txtResult.setText("[" + currentDateTime() + "]      IP Scanner App Ready! \n" + "[" + currentDateTime()
 				+ "]      " + "Status change detected: running\n");
@@ -244,12 +251,20 @@ public class MyController implements Initializable {
 		}
 	}
 
-	public void Reset() {
+	public void Stop() {
 		startScan.setDisable(false);
-		btnReset.setDisable(true);
+		statusBar.setProgress(0);
+		btnReset.setDisable(false);
 		for (int i = 0; i < threads.length; i++) {
 			threads[i].stop();
 		}
+		txtResult.appendText("[" + currentDateTime() + "]      Stopped! \n");
+	}
+
+	public void Reset() {
+		startScan.setDisable(false);
+		statusBar.setProgress(0);
+		btnStop.setDisable(true);
 		txtResult.setText("");
 	}
 
@@ -266,17 +281,29 @@ public class MyController implements Initializable {
 			int timeout = 3000;
 			for (long i = ipStart; i <= ipDest; i++) {
 				String name = LongtoIp(i);
-				// System.out.println("Name: " + name);
 				InetAddress ipAddress;
 				try {
 					ipAddress = InetAddress.getByName(name);
 					if (ipAddress.isReachable(timeout)) {
 						String address = ipAddress.getHostAddress();
 						String hostName = ipAddress.getHostName();
-						System.out.println("[" + currentDateTime() + "]      The IP address " + address + " ("
-								+ hostName + ") is available in the network");
+						if (address.equals(hostName)) {
+							hostName = "Unknow";
+						}
 						txtResult.appendText("[" + currentDateTime() + "]      The IP address " + address + " ("
 								+ hostName + ") is available in the network\n");
+						System.out.println("[" + currentDateTime() + "]      The IP address " + address + " ("
+								+ hostName + ") is available in the network");
+						count += (double) 100 / range;
+						statusBar.setProgress((double) count / 100);
+					} else {
+						count += (double) 100 / range;
+						statusBar.setProgress((double) count / 100);
+					}
+					if (count == 100.0) {
+						System.out.println("Done!");
+						statusBar.setProgress((double) count / 100);
+						txtResult.appendText("[" + currentDateTime() + "]      Done! \n");
 					}
 				} catch (IOException e) {
 					e.printStackTrace();
