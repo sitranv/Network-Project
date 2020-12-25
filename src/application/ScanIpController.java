@@ -16,15 +16,17 @@ import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
 
-public class MyController implements Initializable {
+public class ScanIpController implements Initializable {
 	private Thread[] threads = null;
 	private final static int NUM_THREAD = 64;
 	@FXML
 	private Label hostName, hostIP;
 	@FXML
-	private Button click, startScan, btnReset, btnStop;
+	private Button click, startScan, btnStop;
 	@FXML
 	private TextArea txtResult;
+	@FXML
+	public Button btnReset;
 	@FXML
 	private ProgressBar statusBar;
 	@FXML
@@ -36,63 +38,6 @@ public class MyController implements Initializable {
 	public int range;
 	public double count = 0;
 	String scanMode = "Default Scan";
-
-	public void getLocalInfo() throws UnknownHostException, SocketException {
-		InetAddress local = InetAddress.getLocalHost();
-		hostName.setText(local.getHostName());
-		hostIP.setText(local.getHostAddress());
-		String subnetMask = hostIP.getText().substring(0, hostIP.getText().lastIndexOf(".") + 1);
-		ipStart.setText(subnetMask);
-		ipDest.setText(subnetMask);
-		System.out.println(local.getHostAddress() + "      " + local.getHostName());
-		NetworkInterface nw = NetworkInterface.getByInetAddress(local);
-		int mask = nw.getInterfaceAddresses().get(0).getNetworkPrefixLength();
-		System.out.println("Mask: " + mask);
-		System.out.println("SubnetMask:  " + getSubnetmask(mask));
-		String[] SubnetMask = getSubnetmask(mask).split("\\.");
-		String[] LocalIP = local.getHostAddress().split("\\.");
-		StringBuffer NetworkAddress = new StringBuffer();
-		StringBuffer BroadcastAddress = new StringBuffer();
-
-		for (int i = 0; i < 4; i++) {
-			if (NetworkAddress.length() > 0) {
-				NetworkAddress.append(".");
-				BroadcastAddress.append(".");
-			}
-			NetworkAddress.append(Integer.parseInt(LocalIP[i]) & Integer.parseInt(SubnetMask[i]));
-			BroadcastAddress.append((Integer.parseInt(LocalIP[i]) & Integer.parseInt(SubnetMask[i]))
-					^ (Integer.parseInt(SubnetMask[i]) ^ (0xFF)));
-		}
-		ipNA = ipToLong(NetworkAddress.toString());
-		ipBA = ipToLong(BroadcastAddress.toString());
-		System.out.println("NetworkAddress: " + NetworkAddress);
-		System.out.println("BroadcastAddress: " + BroadcastAddress);
-
-		range = (int) (ipBA - ipNA + 1);
-
-		System.out.println("Range: " + range);
-		txtResult.setText("");
-	}
-
-	public String getSubnetmask(int mask) {
-		long temp = 0;
-		int dem = 0;
-		while (mask >= 8) {
-			dem++;
-			mask -= 8;
-		}
-		if (mask % 8 != 0) {
-			for (int i = 1; i <= mask % 8; i++) {
-				temp += (long) power(2, 32 - 8 * dem - i);
-			}
-		}
-		if (dem != 0) {
-			for (int i = 1; i <= dem; i++) {
-				temp += (long) 255 * power(2, 32 - 8 * i);
-			}
-		}
-		return LongtoIp(temp);
-	}
 
 	@Override
 	public void initialize(URL location, ResourceBundle resources) {
@@ -135,15 +80,77 @@ public class MyController implements Initializable {
 		}
 	}
 
+	public void getLocalInfo() throws UnknownHostException, SocketException {
+		// get address of localhost
+		InetAddress local = InetAddress.getLocalHost();
+		// get localhost name
+		hostName.setText(local.getHostName());
+		hostIP.setText(local.getHostAddress());
+		System.out.println(local.getHostAddress() + "  -  " + local.getHostName());
+		// get subnetmask
+		NetworkInterface nw = NetworkInterface.getByInetAddress(local);
+		int mask = nw.getInterfaceAddresses().get(0).getNetworkPrefixLength();
+		System.out.println("Mask: " + mask);
+		System.out.println("SubnetMask:  " + getSubnetmask(mask));
+		String[] SubnetMask = getSubnetmask(mask).split("\\.");
+		String[] LocalIP = local.getHostAddress().split("\\.");
+		StringBuffer NetworkAddress = new StringBuffer();
+		StringBuffer BroadcastAddress = new StringBuffer();
+		for (int i = 0; i < 4; i++) {
+			if (NetworkAddress.length() > 0) {
+				NetworkAddress.append(".");
+				BroadcastAddress.append(".");
+			}
+			NetworkAddress.append(Integer.parseInt(LocalIP[i]) & Integer.parseInt(SubnetMask[i]));
+			BroadcastAddress.append((Integer.parseInt(LocalIP[i]) & Integer.parseInt(SubnetMask[i]))
+					^ (Integer.parseInt(SubnetMask[i]) ^ (0xFF)));
+		}
+		ipNA = ipToLong(NetworkAddress.toString());
+		ipBA = ipToLong(BroadcastAddress.toString());
+		System.out.println("NetworkAddress: " + NetworkAddress);
+		System.out.println("BroadcastAddress: " + BroadcastAddress);
+		String hostStart = NetworkAddress.substring(0, hostIP.getText().lastIndexOf(".") + 1);
+		String hostEnd = BroadcastAddress.substring(0, hostIP.getText().lastIndexOf(".") + 1);
+		ipStart.setText(hostStart);
+		ipDest.setText(hostEnd);
+		range = (int) (ipBA - ipNA + 1);
+		System.out.println("Range: " + range);
+		txtResult.setText("");
+	}
+
+	public String getSubnetmask(int mask) {
+		long temp = power(2, 32) - power(2, 32 - mask);
+		return LongtoIp(temp);
+//		int dem = 0;
+//		while (mask >= 8) {
+//			dem++;
+//			mask -= 8;
+//		}
+//		
+//		if (mask % 8 != 0) {
+//			for (int i = 1; i <= mask % 8; i++) {
+//				temp += (long) power(2, 32 - 8 * dem - i);
+//			}
+//		}
+//		if (dem != 0) { 
+//			for (int i = 1; i <= dem; i++) {
+//				temp += (long) 255 * power(2, 32 - 8 * i);
+//			}
+//		}
+//		return LongtoIp(temp);
+	}
+
 	public static long ipToLong(String str) {
 		String[] ipAddress = str.split("\\.");
-		long address;
-		long octet1 = (Long.parseLong(ipAddress[0]) * power(2, 24));
-		long octet2 = (Long.parseLong(ipAddress[1]) * power(2, 16));
-		long octet3 = (Long.parseLong(ipAddress[2]) * power(2, 8));
-		long octet4 = (Long.parseLong(ipAddress[3]));
-		address = octet1 + octet2 + octet3 + octet4;
-
+		long address = 0;
+		for (int i = 0; i < ipAddress.length; i++) {
+			address += (Long.parseLong(ipAddress[i]) * power(2, 32 - 8 * (i + 1)));
+		}
+//		long octet1 = (Long.parseLong(ipAddress[0]) * power(2, 24));
+//		long octet2 = (Long.parseLong(ipAddress[1]) * power(2, 16));
+//		long octet3 = (Long.parseLong(ipAddress[2]) * power(2, 8));
+//		long octet4 = (Long.parseLong(ipAddress[3]));
+//		address = octet1 + octet2 + octet3 + octet4;
 		return address;
 	}
 
@@ -163,20 +170,20 @@ public class MyController implements Initializable {
 	}
 
 	private String currentDateTime() {
-		return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis());
+		return new SimpleDateFormat("dd-MM-yyyy HH:mm:ss").format(System.currentTimeMillis());
 	}
 
 	public void RunScan() throws SocketException {
 		count = 0;
-		btnReset.setDisable(false);
+		btnReset.setDisable(true);
 		btnStop.setDisable(false);
 		txtResult.setText("");
+		statusBar.setProgress(0);
 		if (scanMode.equals("Default Scan")) {
 			DefaultScan();
 		} else {
 			if (checkInput() == false) {
 				startScan.setDisable(false);
-
 				btnStop.setDisable(true);
 				System.out.println("Nhap lai");
 			} else {
@@ -206,7 +213,7 @@ public class MyController implements Initializable {
 			return false;
 		} else if (!(checkMask(ip1) && checkMask(ip2))) {
 			System.out.println("Invalid SubnetMask");
-			txtResult.setText("[" + currentDateTime() + "]      Invalid SubnetMask - Try again\n");
+			txtResult.setText("[" + currentDateTime() + "]      Invalid IP Adrress - Try again\n");
 			return false;
 		}
 		return true;
@@ -264,6 +271,7 @@ public class MyController implements Initializable {
 	public void Reset() {
 		startScan.setDisable(false);
 		statusBar.setProgress(0);
+		btnReset.setDisable(true);
 		btnStop.setDisable(true);
 		txtResult.setText("");
 	}
@@ -278,7 +286,7 @@ public class MyController implements Initializable {
 
 		@Override
 		public void run() {
-			int timeout = 3000;
+			int timeout = 5000;
 			for (long i = ipStart; i <= ipDest; i++) {
 				String name = LongtoIp(i);
 				InetAddress ipAddress;
@@ -294,19 +302,21 @@ public class MyController implements Initializable {
 								+ hostName + ") is available in the network\n");
 						System.out.println("[" + currentDateTime() + "]      The IP address " + address + " ("
 								+ hostName + ") is available in the network");
-						count += (double) 100 / range;
-						statusBar.setProgress((double) count / 100);
-					} else {
-						count += (double) 100 / range;
-						statusBar.setProgress((double) count / 100);
+//						count += (double) 100 / range;
+//						statusBar.setProgress((double) count / 100);
 					}
-					if (count == 100.0) {
-						System.out.println("Done!");
-						statusBar.setProgress((double) count / 100);
-						txtResult.appendText("[" + currentDateTime() + "]      Done! \n");
-					}
+					count += (double) 100 / range;
+					statusBar.setProgress((double) count / 100);
+
 				} catch (IOException e) {
 					e.printStackTrace();
+				}
+				System.out.println(count);
+				if (count == 100.0) {
+					System.out.println("Done!");
+					statusBar.setProgress((double) count / 100);
+					txtResult.appendText("[" + currentDateTime() + "]      Done! \n");
+					btnReset.setDisable(false);
 				}
 			}
 		}
